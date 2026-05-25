@@ -1,0 +1,772 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="document-header">
+    <a href="{{ url_for('main.index') }}" class="back-link">← Ana Sayfaya Dön</a>
+    <h1>📄 {{ document.filename }}</h1>
+    <p class="meta">Yüklenme: {{ document.uploaded_at.strftime('%d.%m.%Y %H:%M') }}</p>
+    
+    <div class="document-actions" style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="{{ url_for('main.export_document_pdf', doc_id=document.id) }}" 
+           class="btn-export">
+            📥 PDF Olarak İndir
+        </a>
+        
+        <form action="{{ url_for('main.delete_document', doc_id=document.id) }}" 
+              method="POST"
+              onsubmit="return confirm('Bu dökümanı ve tüm sorularını silmek istediğinden emin misin? Bu işlem geri alınamaz.');"
+              style="display: inline;">
+            <button type="submit" class="btn-delete">
+                🗑️ Bu Dökümanı Sil
+            </button>
+        </form>
+    </div>
+</div>
+
+{% for item in topic_data %}
+<div class="topic-section">
+    <div class="topic-header">
+        <h2>📚 {{ item.topic.topic_name }}</h2>
+        <div class="summary-box">
+            <strong>Özet:</strong>
+            <p>{{ item.topic.summary }}</p>
+        </div>
+        
+        {% if item.topic.difficulty_level %}
+        <div class="topic-meta">
+            <span class="meta-badge">📊 Seviye: {{ item.topic.difficulty_level|replace('_', ' ') }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="questions-section">
+        <h3>📝 Üretilen Sorular ({{ item.questions|length }})</h3>
+        
+        {% if item.questions|length == 0 %}
+        <div class="empty-questions">
+            <p>⚠️ Bu döküman için henüz soru üretilemedi.</p>
+            <p>Yapay zeka modeli yoğun olabilir veya içerik soru üretmeye uygun olmayabilir.</p>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary" style="display: inline-block; width: auto; padding: 0.75rem 2rem; margin-top: 1rem;">Tekrar Dene</a>
+        </div>
+        {% endif %}
+        
+        {% for q in item.questions %}
+        <div class="question-card difficulty-{{ q.difficulty }}">
+            
+            {% if q.source_image_path %}
+            <div class="source-reference">
+                <div class="source-header">
+                    <span class="source-icon">📄</span>
+                    <span class="source-label">Sayfa {{ q.source_page }}'den esinlenildi</span>
+                </div>
+                
+                {% if q.source_description %}
+                <div class="source-explanation">
+                    <strong>💡 AI Açıklaması:</strong>
+                    <p>{{ q.source_description }}</p>
+                </div>
+                {% endif %}
+                
+                <details class="source-page-preview">
+                    <summary>🔍 Sayfa {{ q.source_page }}'yi göster</summary>
+                    <div class="source-image-wrapper">
+                        <img src="/{{ q.source_image_path }}" 
+                             alt="Kaynak sayfa görüntüsü" 
+                             class="source-image"
+                             onclick="window.open('/{{ q.source_image_path }}', '_blank')">
+                        <p class="image-hint">💡 Görsele tıklayarak büyütebilirsin</p>
+                    </div>
+                </details>
+            </div>
+            {% elif q.source_description %}
+            <div class="source-reference no-source">
+                <div class="source-header">
+                    <span class="source-icon">ℹ️</span>
+                    <span class="source-label">Kaynak bilgisi</span>
+                </div>
+                <div class="source-explanation">
+                    <p>{{ q.source_description }}</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="question-header">
+                <div class="question-number-wrapper">
+                    <div class="question-number">Soru {{ loop.index }}</div>
+                    <button class="favorite-btn"
+                            data-question-id="{{ q.id }}"
+                            onclick="toggleFavorite(this, this.dataset.questionId)"
+                            title="Favorilere ekle">
+                        <span class="favorite-icon">☆</span>
+                    </button>
+                </div>
+                <div class="question-meta">
+                    <span class="badge badge-{{ q.difficulty }}">{{ q.difficulty|upper }}</span>
+                    <span class="badge badge-type">{{ q.question_type|replace('_', ' ') }}</span>
+                    
+                    {% if q.bloom_level %}
+                    {% set bloom_icons = {
+                        'hatirlama': ('🧠', 'Hatırlama'),
+                        'anlama': ('💡', 'Anlama'),
+                        'uygulama': ('🔧', 'Uygulama'),
+                        'analiz': ('🔍', 'Analiz'),
+                        'degerlendirme': ('⚖️', 'Değerlendirme'),
+                        'yaratma': ('🎨', 'Yaratma')
+                    } %}
+                    {% set bloom_data = bloom_icons.get(q.bloom_level, ('🎓', q.bloom_level)) %}
+                    <span class="badge badge-bloom" title="Bloom Taksonomisi: {{ bloom_data[1] }}">
+                        {{ bloom_data[0] }} {{ bloom_data[1] }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if q.measured_concept %}
+            <div class="measured-concept">
+                🎯 <strong>Ölçülen Kavram:</strong> {{ q.measured_concept }}
+            </div>
+            {% endif %}
+            
+            <div class="question-body">
+                {{ q.question_text|safe }}
+            </div>
+            
+            {% if q.has_graph and q.graph_svg %}
+            <div class="question-graph">
+                <div class="graph-label">📊 Grafik:</div>
+                <div class="graph-container">
+                    {{ q.graph_svg|safe }}
+                </div>
+                {% if q.graph_description %}
+                <div class="graph-description">
+                    <em>{{ q.graph_description }}</em>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if q.hint %}
+            <details class="hint-box">
+                <summary>💭 İpucu Göster</summary>
+                <div class="hint-content">{{ q.hint|safe }}</div>
+            </details>
+            {% endif %}
+            
+            <button class="video-solution-btn"
+                    data-question-id="{{ q.id }}"
+                    data-question-text="{{ q.question_text|e }}"
+                    data-solution-steps="{{ q.solution_steps|e }}"
+                    data-correct-answer="{{ q.correct_answer|e }}"
+                    onclick="openVideoFromButton(this)">
+                🎬 Video Çözüm İzle
+            </button>
+            
+            <details class="solution">
+                <summary>💡 Çözümü ve Cevabı Göster</summary>
+                <div class="solution-content">
+                    <h4>📋 Çözüm Adımları:</h4>
+                    <ol class="solution-list">
+                        {% for step in q.solution_steps.split('\n') %}
+                            {% if step.strip() %}
+                            <li>{{ step|safe }}</li>
+                            {% endif %}
+                        {% endfor %}
+                    </ol>
+                    {% if q.correct_answer %}
+                    <div class="answer-box">
+                        <h4>✓ Doğru Cevap:</h4>
+                        <div class="answer-content math-content">{{ q.correct_answer|safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+
+            <!-- ═══ GERİ BİLDİRİM BÖLÜMÜ ═══ -->
+            <div class="feedback-section" data-question-id="{{ q.id }}">
+                <div class="feedback-prompt">
+                    <span class="feedback-label">🤔 Bu soru ve çözümü nasıldı?</span>
+                </div>
+
+                <div class="feedback-buttons">
+                    <button class="feedback-btn feedback-btn-positive"
+                            data-question-id="{{ q.id }}"
+                            onclick="sendFeedback(this.dataset.questionId, 'positive')">
+                        <span class="feedback-icon">👍</span>
+                        <span class="feedback-text">Yararlı</span>
+                    </button>
+
+                    <button class="feedback-btn feedback-btn-negative"
+                            data-question-id="{{ q.id }}"
+                            onclick="openNegativeFeedback(this.dataset.questionId)">
+                        <span class="feedback-icon">👎</span>
+                        <span class="feedback-text">Sorun var</span>
+                    </button>
+                </div>
+
+                <!-- Negatif feedback detay formu (gizli) -->
+                <div class="feedback-detail-form" id="feedback-form-{{ q.id }}" style="display: none;">
+                    <p class="feedback-detail-title">Hangi sorun var?</p>
+
+                    <div class="feedback-reasons">
+                        <label class="feedback-reason">
+                            <input type="radio" name="reason-{{ q.id }}" value="yanlis_cevap">
+                            <span>❌ Cevap yanlış</span>
+                        </label>
+                        <label class="feedback-reason">
+                            <input type="radio" name="reason-{{ q.id }}" value="yanlis_soru">
+                            <span>⚠️ Soru hatalı/anlamsız</span>
+                        </label>
+                        <label class="feedback-reason">
+                            <input type="radio" name="reason-{{ q.id }}" value="kotu_aciklama">
+                            <span>📝 Çözüm anlaşılmıyor</span>
+                        </label>
+                        <label class="feedback-reason">
+                            <input type="radio" name="reason-{{ q.id }}" value="diger">
+                            <span>💬 Diğer</span>
+                        </label>
+                    </div>
+
+                    <textarea class="feedback-comment" 
+                              id="feedback-comment-{{ q.id }}"
+                              placeholder="💬 Detaylı açıklama yazmak istersen buraya yazabilirsin (isteğe bağlı)..."
+                              rows="3"></textarea>
+
+                    <div class="feedback-actions">
+                        <button class="btn-feedback-submit"
+                                data-question-id="{{ q.id }}"
+                                onclick="submitNegativeFeedback(this.dataset.questionId)">
+                            <span>📤</span>
+                            <span>Geri bildirimi Gönder</span>
+                        </button>
+                        <button class="btn-feedback-cancel"
+                                data-question-id="{{ q.id }}"
+                                onclick="cancelFeedback(this.dataset.questionId)">
+                            İptal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Teşekkür mesajı (gizli) -->
+                <div class="feedback-thanks" id="feedback-thanks-{{ q.id }}" style="display: none;">
+                    <span class="thanks-icon">✅</span>
+                    <span class="thanks-text">Geri bildiriminiz için teşekkürler!</span>
+                </div>
+            </div>
+
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<!-- Video Çözüm Modal -->
+<div id="video-modal" class="video-modal" style="display: none;">
+    <div class="video-modal-content">
+        <div class="video-modal-header">
+            <h2>🎬 Video Çözüm</h2>
+            <button class="video-modal-close" onclick="closeVideoSolution()">✕</button>
+        </div>
+        
+        <div class="video-modal-body">
+            <div class="video-question-section">
+                <h3>📝 Soru:</h3>
+                <div id="video-question-text" class="video-question-text"></div>
+            </div>
+            
+            <div class="video-board">
+                <div class="video-board-header">
+                    <span class="board-title">📐 Çözüm Tahtası</span>
+                    <span id="step-counter" class="step-counter">Adım 0 / 0</span>
+                </div>
+                
+                <div id="video-steps-container" class="video-steps-container"></div>
+                
+                <div id="video-final-answer" class="video-final-answer" style="display: none;">
+                    <h4>✅ Sonuç:</h4>
+                    <div id="video-answer-content"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="video-modal-footer">
+            <div class="video-progress">
+                <div class="video-progress-bar">
+                    <div id="video-progress-fill" class="video-progress-fill"></div>
+                </div>
+            </div>
+            
+            <div class="video-controls">
+                <button id="btn-restart" class="video-btn" onclick="restartVideo()" title="Baştan">⏮</button>
+                <button id="btn-prev" class="video-btn" onclick="prevStep()" title="Önceki">⏪</button>
+                <button id="btn-play" class="video-btn video-btn-primary" onclick="togglePlay()" title="Oynat/Duraklat">▶</button>
+                <button id="btn-next" class="video-btn" onclick="nextStep()" title="Sonraki">⏩</button>
+                <button id="btn-speed" class="video-btn" onclick="cycleSpeed()" title="Hız">1x</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// VIDEO ÇÖZÜM SİSTEMİ
+// ═══════════════════════════════════════════
+
+let videoState = {
+    steps: [],
+    currentStep: -1,
+    isPlaying: false,
+    intervalId: null,
+    speed: 1,
+    questionText: '',
+    correctAnswer: '',
+    typewriterTimeout: null
+};
+
+function openVideoFromButton(btn) {
+    const questionId = btn.getAttribute('data-question-id');
+    const questionText = btn.getAttribute('data-question-text');
+    const solutionSteps = btn.getAttribute('data-solution-steps');
+    const correctAnswer = btn.getAttribute('data-correct-answer');
+    openVideoSolution(questionId, questionText, solutionSteps, correctAnswer);
+}
+
+function openVideoSolution(questionId, questionText, solutionSteps, correctAnswer) {
+    const modal = document.getElementById('video-modal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    const steps = solutionSteps.split('\n').filter(s => s.trim());
+    
+    videoState = {
+        steps: steps,
+        currentStep: -1,
+        isPlaying: false,
+        intervalId: null,
+        speed: 1,
+        questionText: questionText,
+        correctAnswer: correctAnswer,
+        typewriterTimeout: null
+    };
+    
+    document.getElementById('video-question-text').innerHTML = questionText;
+    document.getElementById('video-final-answer').style.display = 'none';
+    
+    const container = document.getElementById('video-steps-container');
+    container.innerHTML = '';
+    steps.forEach((step, idx) => {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'video-step';
+        stepDiv.dataset.stepIndex = idx;
+        stepDiv.innerHTML = `
+            <div class="step-number-badge">${idx + 1}</div>
+            <div class="step-content" data-original-text="${step.replace(/"/g, '&quot;')}"></div>
+        `;
+        container.appendChild(stepDiv);
+    });
+    
+    updateStepCounter();
+    
+    if (window.MathJax) {
+        MathJax.typesetPromise([document.getElementById('video-question-text')]);
+    }
+    
+    setTimeout(() => togglePlay(), 500);
+}
+
+function closeVideoSolution() {
+    document.getElementById('video-modal').style.display = 'none';
+    document.body.style.overflow = '';
+    if (videoState.intervalId) clearTimeout(videoState.intervalId);
+    if (videoState.typewriterTimeout) clearTimeout(videoState.typewriterTimeout);
+    videoState.isPlaying = false;
+}
+
+function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (videoState.isPlaying) {
+        videoState.isPlaying = false;
+        btn.innerHTML = '▶';
+        if (videoState.intervalId) clearTimeout(videoState.intervalId);
+        if (videoState.typewriterTimeout) clearTimeout(videoState.typewriterTimeout);
+    } else {
+        videoState.isPlaying = true;
+        btn.innerHTML = '⏸';
+        playNextStep();
+    }
+}
+
+function playNextStep() {
+    if (!videoState.isPlaying) return;
+    if (videoState.currentStep >= videoState.steps.length - 1) {
+        showFinalAnswer();
+        videoState.isPlaying = false;
+        document.getElementById('btn-play').innerHTML = '▶';
+        return;
+    }
+    nextStep();
+    const delay = 3000 / videoState.speed;
+    videoState.intervalId = setTimeout(playNextStep, delay);
+}
+
+function nextStep() {
+    if (videoState.currentStep >= videoState.steps.length - 1) return;
+    videoState.currentStep++;
+    const stepElement = document.querySelector(`[data-step-index="${videoState.currentStep}"]`);
+    
+    if (stepElement) {
+        stepElement.classList.add('active');
+        const contentEl = stepElement.querySelector('.step-content');
+        const originalText = contentEl.dataset.originalText;
+        
+        typewriterEffect(contentEl, originalText, () => {
+            if (window.MathJax) MathJax.typesetPromise([contentEl]);
+        });
+        
+        stepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateStepCounter();
+    updateProgressBar();
+}
+
+function prevStep() {
+    if (videoState.currentStep < 0) return;
+    const stepElement = document.querySelector(`[data-step-index="${videoState.currentStep}"]`);
+    if (stepElement) {
+        stepElement.classList.remove('active');
+        stepElement.querySelector('.step-content').innerHTML = '';
+    }
+    videoState.currentStep--;
+    document.getElementById('video-final-answer').style.display = 'none';
+    updateStepCounter();
+    updateProgressBar();
+}
+
+function restartVideo() {
+    document.querySelectorAll('.video-step').forEach(s => {
+        s.classList.remove('active');
+        s.querySelector('.step-content').innerHTML = '';
+    });
+    document.getElementById('video-final-answer').style.display = 'none';
+    videoState.currentStep = -1;
+    videoState.isPlaying = false;
+    document.getElementById('btn-play').innerHTML = '▶';
+    updateStepCounter();
+    updateProgressBar();
+    if (videoState.intervalId) clearTimeout(videoState.intervalId);
+    if (videoState.typewriterTimeout) clearTimeout(videoState.typewriterTimeout);
+    setTimeout(() => togglePlay(), 500);
+}
+
+function cycleSpeed() {
+    const speeds = [1, 1.5, 2, 0.5];
+    const currentIdx = speeds.indexOf(videoState.speed);
+    videoState.speed = speeds[(currentIdx + 1) % speeds.length];
+    document.getElementById('btn-speed').innerHTML = videoState.speed + 'x';
+}
+
+function updateStepCounter() {
+    const total = videoState.steps.length;
+    const current = videoState.currentStep + 1;
+    document.getElementById('step-counter').textContent = `Adım ${current} / ${total}`;
+}
+
+function updateProgressBar() {
+    const total = videoState.steps.length;
+    const current = Math.max(0, videoState.currentStep + 1);
+    const percent = total > 0 ? (current / total) * 100 : 0;
+    document.getElementById('video-progress-fill').style.width = percent + '%';
+}
+
+function showFinalAnswer() {
+    const finalDiv = document.getElementById('video-final-answer');
+    const contentEl = document.getElementById('video-answer-content');
+    
+    let answerText = videoState.correctAnswer || '';
+    const hasLatexCommand = /\\(frac|int|sqrt|pi|alpha|beta|gamma|theta|sum|prod|lim|infty|partial|nabla|cdot|times|div|leq|geq|neq|approx|in|notin|subset|supset|cap|cup|forall|exists|to|leftarrow|rightarrow|mathbb|mathcal|left|right|begin|end)/.test(answerText);
+    const hasDollar = /\$/.test(answerText);
+    
+    if (hasLatexCommand && !hasDollar) {
+        answerText = '$' + answerText + '$';
+    }
+    
+    contentEl.innerHTML = answerText;
+    finalDiv.style.display = 'block';
+    
+    if (window.MathJax) MathJax.typesetPromise([contentEl]);
+    finalDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function typewriterEffect(element, text, onComplete) {
+    let i = 0;
+    element.innerHTML = '';
+    const speed = 15 / videoState.speed;
+    
+    function type() {
+        if (i < text.length) {
+            element.innerHTML += text.charAt(i);
+            i++;
+            videoState.typewriterTimeout = setTimeout(type, speed);
+        } else if (onComplete) {
+            onComplete();
+        }
+    }
+    type();
+}
+
+// Klavye kısayolları
+document.addEventListener('keydown', function(e) {
+    const modalVisible = document.getElementById('video-modal').style.display === 'flex';
+    if (!modalVisible) return;
+    
+    if (e.key === 'Escape') closeVideoSolution();
+    if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    if (e.key === 'ArrowRight') nextStep();
+    if (e.key === 'ArrowLeft') prevStep();
+});
+
+// ═══════════════════════════════════════════
+// MATEMATİK OTOMATİK SARMA
+// ═══════════════════════════════════════════
+
+function autoWrapMath() {
+    document.querySelectorAll('.math-content').forEach(function(el) {
+        let text = el.innerHTML;
+        const hasLatexCommand = /\\(frac|int|sqrt|pi|alpha|beta|gamma|theta|sum|prod|lim|infty|partial|nabla|cdot|times|div|leq|geq|neq|approx|in|notin|subset|supset|cap|cup|forall|exists|to|leftarrow|rightarrow|mathbb|mathcal|left|right|begin|end)/.test(text);
+        const hasDollar = /\$/.test(text);
+        
+        if (hasLatexCommand && !hasDollar) {
+            el.innerHTML = '$' + text + '$';
+        }
+        
+        const looksLikeMathExpr = /^[A-Za-z]'?\([a-z]\)\s*=/.test(text.trim());
+        if (looksLikeMathExpr && !hasDollar) {
+            el.innerHTML = '$' + text + '$';
+        }
+    });
+}
+
+window.addEventListener('load', function() {
+    autoWrapMath();
+    if (window.MathJax) MathJax.typesetPromise();
+});
+
+document.querySelectorAll('details').forEach(function(detail) {
+    detail.addEventListener('toggle', function() {
+        if (this.open) {
+            autoWrapMath();
+            if (window.MathJax) MathJax.typesetPromise([this]);
+        }
+    });
+});
+// ═══════════════════════════════════════════
+// GERİ BİLDİRİM SİSTEMİ
+// ═══════════════════════════════════════════
+
+async function sendFeedback(questionId, rating, reason = null, comment = '') {
+    try {
+        const response = await fetch('/api/feedback/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question_id: questionId,
+                rating: rating,
+                reason: reason,
+                comment: comment
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showFeedbackThanks(questionId, rating);
+        } else {
+            alert('Geri bildirim gönderilemedi: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('Feedback hatası:', error);
+        alert('Geri bildirim gönderilemedi. Bağlantınızı kontrol edin.');
+    }
+}
+
+function openNegativeFeedback(questionId) {
+    // Detay formunu göster
+    const form = document.getElementById(`feedback-form-${questionId}`);
+    if (form) {
+        form.style.display = 'block';
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+async function submitNegativeFeedback(questionId) {
+    // Seçilen sebebi al
+    const selectedReason = document.querySelector(`input[name="reason-${questionId}"]:checked`);
+    const reason = selectedReason ? selectedReason.value : null;
+    
+    // Yorumu al
+    const commentEl = document.getElementById(`feedback-comment-${questionId}`);
+    const comment = commentEl ? commentEl.value.trim() : '';
+    
+    // Gönder
+    await sendFeedback(questionId, 'negative', reason, comment);
+}
+
+function cancelFeedback(questionId) {
+    const form = document.getElementById(`feedback-form-${questionId}`);
+    if (form) form.style.display = 'none';
+}
+
+function showFeedbackThanks(questionId, rating) {
+    // Butonları gizle
+    const section = document.querySelector(`.feedback-section[data-question-id="${questionId}"]`);
+    if (section) {
+        const buttons = section.querySelector('.feedback-buttons');
+        const prompt = section.querySelector('.feedback-prompt');
+        const detailForm = document.getElementById(`feedback-form-${questionId}`);
+        
+        if (buttons) buttons.style.display = 'none';
+        if (prompt) prompt.style.display = 'none';
+        if (detailForm) detailForm.style.display = 'none';
+        
+        // Teşekkür mesajını göster
+        const thanks = document.getElementById(`feedback-thanks-${questionId}`);
+        if (thanks) {
+            thanks.style.display = 'flex';
+            const icon = thanks.querySelector('.thanks-icon');
+            const text = thanks.querySelector('.thanks-text');
+            
+            if (rating === 'positive') {
+                if (icon) icon.textContent = '🎉';
+                if (text) text.textContent = 'Geri bildiriminiz için teşekkürler! Daha iyi sorular üretmemize yardımcı oluyorsun.';
+            } else {
+                if (icon) icon.textContent = '🙏';
+                if (text) text.textContent = 'Bildirin için teşekkürler! Bu geri bildirimi sistemi geliştirmek için kullanacağız.';
+            }
+        }
+    }
+}
+
+// Sayfa yüklendiğinde — mevcut feedback'leri kontrol et ve UI'yi güncelle
+async function loadExistingFeedbacks() {
+    const sections = document.querySelectorAll('.feedback-section');
+    
+    for (const section of sections) {
+        const questionId = section.dataset.questionId;
+        if (!questionId) continue;
+        
+        try {
+            const response = await fetch(`/api/feedback/get/${questionId}`);
+            const data = await response.json();
+            
+            if (data.success && data.has_feedback) {
+                // Bu soru için zaten feedback verilmiş, UI'yi güncelle
+                showFeedbackThanks(questionId, data.rating);
+            }
+        } catch (error) {
+            // Sessizce geç
+        }
+    }
+}
+
+// Sayfa yüklendiğinde feedback'leri yükle
+window.addEventListener('load', function() {
+    loadExistingFeedbacks();
+});
+// ═══════════════════════════════════════════
+// FAVORI SİSTEMİ
+// ═══════════════════════════════════════════
+
+async function toggleFavorite(button, questionId) {
+    // Buton animasyon
+    button.classList.add('animating');
+    
+    try {
+        const response = await fetch('/api/favorite/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ question_id: questionId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const icon = button.querySelector('.favorite-icon');
+            
+            if (data.is_favorite) {
+                // Favorilere eklendi
+                button.classList.add('is-favorite');
+                if (icon) icon.textContent = '⭐';
+                button.title = 'Favorilerden çıkar';
+                showFavoriteToast('⭐ Favorilere eklendi', 'success');
+            } else {
+                // Favorilerden çıkarıldı
+                button.classList.remove('is-favorite');
+                if (icon) icon.textContent = '☆';
+                button.title = 'Favorilere ekle';
+                showFavoriteToast('☆ Favorilerden çıkarıldı', 'info');
+            }
+        } else {
+            showFavoriteToast('Bir hata oluştu', 'error');
+        }
+    } catch (error) {
+        console.error('Favori hatası:', error);
+        showFavoriteToast('Bağlantı hatası', 'error');
+    } finally {
+        setTimeout(() => {
+            button.classList.remove('animating');
+        }, 600);
+    }
+}
+
+function showFavoriteToast(message, type) {
+    // Mevcut toast varsa kaldır
+    const existing = document.querySelector('.favorite-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = `favorite-toast favorite-toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Animasyon ekle
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // 2.5 saniye sonra kaldır
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
+}
+
+// Sayfa yüklendiğinde — mevcut favori durumlarını kontrol et
+async function loadFavoriteStatuses() {
+    const buttons = document.querySelectorAll('.favorite-btn');
+    
+    for (const button of buttons) {
+        const questionId = button.dataset.questionId;
+        if (!questionId) continue;
+        
+        try {
+            const response = await fetch(`/api/favorite/status/${questionId}`);
+            const data = await response.json();
+            
+            if (data.success && data.is_favorite) {
+                button.classList.add('is-favorite');
+                const icon = button.querySelector('.favorite-icon');
+                if (icon) icon.textContent = '⭐';
+                button.title = 'Favorilerden çıkar';
+            }
+        } catch (error) {
+            // Sessizce geç
+        }
+    }
+}
+
+window.addEventListener('load', function() {
+    loadFavoriteStatuses();
+});
+</script>
+
+{% endblock %}

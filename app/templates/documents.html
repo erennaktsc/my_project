@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="documents-header">
+    <h1>📚 Geçmişim</h1>
+    <p class="subtitle">Yüklediğin tüm dökümanlar burada</p>
+</div>
+
+{% if documents %}
+<div class="documents-grid">
+    {% for doc in documents %}
+    <div class="doc-card">
+        <div class="doc-icon">
+            {% if doc.file_type == 'pdf' %}📄{% else %}🖼️{% endif %}
+        </div>
+        <div class="doc-info">
+            <h3 class="doc-name">{{ doc.filename }}</h3>
+            <p class="doc-date">📅 {{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') }}</p>
+        </div>
+        <div class="doc-actions">
+            <a href="{{ url_for('main.view_document', doc_id=doc.id) }}" class="btn-view">
+                👁️ Görüntüle
+            </a>
+            <form action="{{ url_for('main.delete_document', doc_id=doc.id) }}" 
+                  method="POST" 
+                  onsubmit="return confirm('Bu dökümanı ve tüm sorularını silmek istediğinden emin misin? Bu işlem geri alınamaz.');"
+                  style="display: inline; flex: 1;">
+                <button type="submit" class="btn-delete" style="width: 100%;">
+                    🗑️ Sil
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <h2>Henüz hiç döküman yüklemedin</h2>
+    <p>Ana sayfadan bir PDF veya görüntü yükleyerek başla.</p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary" style="display: inline-block; width: auto; padding: 0.75rem 2rem;">Ana Sayfaya Git</a>
+</div>
+{% endif %}
+{% endblock %}

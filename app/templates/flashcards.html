@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flashcards-hero">
+    <h1>🎴 Flashcard Çalışma</h1>
+    <p class="subtitle">Sorularını flashcard formatında tekrar et ve aralıklı tekrarla kalıcı öğren</p>
+</div>
+
+<div class="flashcards-stats">
+    <div class="stat-card">
+        <div class="stat-icon">📚</div>
+        <div class="stat-value">{{ total_questions }}</div>
+        <div class="stat-label">Toplam Soru</div>
+    </div>
+    
+    <div class="stat-card stat-card-primary">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-value">{{ due_today }}</div>
+        <div class="stat-label">Bugün Çalışmalısın</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">✨</div>
+        <div class="stat-value">{{ new_count }}</div>
+        <div class="stat-label">Yeni Kart</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-value">{{ success_rate }}%</div>
+        <div class="stat-label">Başarı Oranı</div>
+    </div>
+</div>
+
+<div class="flashcards-modes">
+    <h2>🎯 Hangi Modda Çalışmak İstersin?</h2>
+    
+    <div class="mode-cards">
+        {% if due_today > 0 %}
+        <a href="{{ url_for('main.flashcards_study', mode='due') }}" class="mode-card mode-card-primary">
+            <div class="mode-icon">⏰</div>
+            <div class="mode-title">Bugünün Çalışması</div>
+            <div class="mode-desc">Zamanı gelmiş {{ due_today }} kart seni bekliyor</div>
+            <div class="mode-cta">Başla →</div>
+        </a>
+        {% endif %}
+        
+        {% if new_count > 0 %}
+        <a href="{{ url_for('main.flashcards_study', mode='new') }}" class="mode-card">
+            <div class="mode-icon">✨</div>
+            <div class="mode-title">Yeni Kartlar</div>
+            <div class="mode-desc">{{ new_count }} yeni soruyla tanış</div>
+            <div class="mode-cta">Başla →</div>
+        </a>
+        {% endif %}
+        
+        <a href="{{ url_for('main.flashcards_study', mode='favorites') }}" class="mode-card">
+            <div class="mode-icon">⭐</div>
+            <div class="mode-title">Favori Sorular</div>
+            <div class="mode-desc">Yıldızladıklarını tekrar et</div>
+            <div class="mode-cta">Başla →</div>
+        </a>
+        
+        <a href="{{ url_for('main.flashcards_study', mode='all') }}" class="mode-card">
+            <div class="mode-icon">🎲</div>
+            <div class="mode-title">Karışık Mod</div>
+            <div class="mode-desc">Tüm sorulardan rastgele</div>
+            <div class="mode-cta">Başla →</div>
+        </a>
+    </div>
+    
+    {% if total_questions == 0 %}
+    <div class="flashcards-empty">
+        <div class="empty-icon">🎴</div>
+        <h3>Henüz hiç sorun yok</h3>
+        <p>Önce bir PDF yükleyip sorular üretmelisin.</p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary" 
+           style="display: inline-block; width: auto; padding: 0.75rem 2rem; margin-top: 1rem;">
+            🏠 Ana Sayfaya Git
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="flashcards-info">
+    <h3>💡 Nasıl Çalışır?</h3>
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="info-icon">1️⃣</div>
+            <div class="info-text">
+                <strong>Soruyu Oku</strong>
+                <p>Kart önce sadece soruyu gösterir. Cevabı düşün, hatırlamaya çalış.</p>
+            </div>
+        </div>
+        <div class="info-item">
+            <div class="info-icon">2️⃣</div>
+            <div class="info-text">
+                <strong>Kartı Çevir</strong>
+                <p>Boşluk tuşuna bas veya tıkla. Cevap ve çözüm görünür.</p>
+            </div>
+        </div>
+        <div class="info-item">
+            <div class="info-icon">3️⃣</div>
+            <div class="info-text">
+                <strong>Kendini Değerlendir</strong>
+                <p>"Hiç Bilmiyordum / Zor / İyi / Kolay" seç. Sistem uygun aralıkta tekrar getirir.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    
+    <!-- Header -->
+    <div class="dashboard-header">
+        <h1>📊 İstatistiklerim</h1>
+        <p class="dashboard-subtitle">Çalışma ilerlemen ve başarıların</p>
+    </div>
+    
+    <!-- Loading -->
+    <div id="dashboard-loading" class="dashboard-loading">
+        <div class="loading-spinner"></div>
+        <p>İstatistikler yükleniyor...</p>
+    </div>
+    
+    <!-- Content (hidden initially) -->
+    <div id="dashboard-content" style="display: none;">
+        
+        <!-- ═══ Ana İstatistik Kartları ═══ -->
+        <div class="dashboard-stats-grid">
+            <div class="dash-stat-card stat-primary">
+                <div class="dash-stat-icon">📄</div>
+                <div class="dash-stat-value" id="stat-documents">0</div>
+                <div class="dash-stat-label">Toplam Doküman</div>
+            </div>
+            
+            <div class="dash-stat-card stat-secondary">
+                <div class="dash-stat-icon">🎯</div>
+                <div class="dash-stat-value" id="stat-questions">0</div>
+                <div class="dash-stat-label">Üretilen Soru</div>
+            </div>
+            
+            <div class="dash-stat-card stat-streak">
+                <div class="dash-stat-icon">🔥</div>
+                <div class="dash-stat-value" id="stat-streak">0</div>
+                <div class="dash-stat-label">Günlük Seri</div>
+            </div>
+            
+            <div class="dash-stat-card stat-accuracy">
+                <div class="dash-stat-icon">🎓</div>
+                <div class="dash-stat-value" id="stat-accuracy">0%</div>
+                <div class="dash-stat-label">Doğruluk Oranı</div>
+            </div>
+        </div>
+        
+        <!-- ═══ Haftalık Aktivite ═══ -->
+        <div class="dashboard-section">
+            <h2 class="section-title">📈 Son 7 Günlük Aktivite</h2>
+            <div class="weekly-chart-container">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- ═══ İki Kolonlu Grafikler ═══ -->
+        <div class="dashboard-grid-2col">
+            <div class="dashboard-section">
+                <h2 class="section-title">🎯 Zorluk Dağılımı</h2>
+                <div class="small-chart-container">
+                    <canvas id="difficultyChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="dashboard-section">
+                <h2 class="section-title">🧠 Bloom Taksonomisi</h2>
+                <div class="small-chart-container">
+                    <canvas id="bloomChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ═══ En Çok Çalışılan Konular ═══ -->
+        <div class="dashboard-section">
+            <h2 class="section-title">📚 En Çok Çalıştığın Konular</h2>
+            <div id="top-topics-list" class="topics-list">
+                <!-- JS ile doldurulacak -->
+            </div>
+        </div>
+        
+        <!-- ═══ Achievements ═══ -->
+        <div class="dashboard-section">
+            <h2 class="section-title">🏆 Başarılarım</h2>
+            <div id="achievements-grid" class="achievements-grid">
+                <!-- JS ile doldurulacak -->
+            </div>
+        </div>
+        
+        <!-- ═══ Son Aktiviteler ═══ -->
+        <div class="dashboard-section">
+            <h2 class="section-title">📅 Son Eklenen Dökümanlar</h2>
+            <div id="recent-docs-list" class="recent-docs">
+                <!-- JS ile doldurulacak -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════
+// DASHBOARD INITIALIZATION
+// ═══════════════════════════════════════════
+
+let charts = {};
+
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/stats/dashboard');
+        const data = await response.json();
+        
+        if (!data.success) {
+            console.error('Dashboard yüklenemedi');
+            return;
+        }
+        
+        const stats = data.stats;
+        
+        // Loading'i gizle, içeriği göster
+        document.getElementById('dashboard-loading').style.display = 'none';
+        document.getElementById('dashboard-content').style.display = 'block';
+        
+        // Render
+        renderMainStats(stats);
+        renderWeeklyChart(stats.weekly_activity);
+        renderDifficultyChart(stats.difficulty_distribution);
+        renderBloomChart(stats.bloom_distribution);
+        renderTopTopics(stats.top_topics);
+        renderAchievements(stats.achievements);
+        renderRecentDocs(stats.recent_documents);
+        
+    } catch (error) {
+        console.error('Dashboard hatası:', error);
+        document.getElementById('dashboard-loading').innerHTML = 
+            '<p style="color: var(--error);">⚠️ İstatistikler yüklenemedi. Lütfen sayfayı yenile.</p>';
+    }
+}
+
+// ═══════════════════════════════════════════
+// ANA İSTATİSTİKLER
+// ═══════════════════════════════════════════
+
+function renderMainStats(stats) {
+    document.getElementById('stat-documents').textContent = stats.total_documents;
+    document.getElementById('stat-questions').textContent = stats.total_questions;
+    document.getElementById('stat-streak').textContent = stats.current_streak;
+    document.getElementById('stat-accuracy').textContent = stats.accuracy + '%';
+}
+
+// ═══════════════════════════════════════════
+// HAFTALIK CHART
+// ═══════════════════════════════════════════
+
+function renderWeeklyChart(weekly) {
+    const ctx = document.getElementById('weeklyChart');
+    if (!ctx) return;
+    
+    const labels = weekly.map(d => d.day_name + '\n' + d.date);
+    const flashcardData = weekly.map(d => d.flashcards);
+    const documentData = weekly.map(d => d.documents);
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#e2e8f0' : '#374151';
+    const gridColor = isDark ? '#334155' : '#e5e7eb';
+    
+    charts.weekly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Flashcard Çalışma',
+                    data: flashcardData,
+                    backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                    borderColor: '#6366f1',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'PDF Yükleme',
+                    data: documentData,
+                    backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                    borderColor: '#a855f7',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: textColor, font: { size: 13 } }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor, stepSize: 1 },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════
+// ZORLUK DAĞILIMI
+// ═══════════════════════════════════════════
+
+function renderDifficultyChart(difficulty) {
+    const ctx = document.getElementById('difficultyChart');
+    if (!ctx) return;
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#e2e8f0' : '#374151';
+    
+    charts.difficulty = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Kolay', 'Orta', 'Zor'],
+            datasets: [{
+                data: [difficulty.kolay, difficulty.orta, difficulty.zor],
+                backgroundColor: ['#10b981', '#fbbf24', '#ef4444'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: textColor, font: { size: 13 }, padding: 15 }
+                }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════
+// BLOOM TAKSONOMİSİ
+// ═══════════════════════════════════════════
+
+function renderBloomChart(bloom) {
+    const ctx = document.getElementById('bloomChart');
+    if (!ctx) return;
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#e2e8f0' : '#374151';
+    const gridColor = isDark ? '#334155' : '#e5e7eb';
+    
+    charts.bloom = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Hatırlama', 'Anlama', 'Uygulama', 'Analiz', 'Değerlendirme', 'Yaratma'],
+            datasets: [{
+                label: 'Soru Sayısı',
+                data: [
+                    bloom.hatirlama,
+                    bloom.anlama,
+                    bloom.uygulama,
+                    bloom.analiz,
+                    bloom.degerlendirme,
+                    bloom.yaratma
+                ],
+                backgroundColor: 'rgba(139, 92, 246, 0.3)',
+                borderColor: '#8b5cf6',
+                borderWidth: 2,
+                pointBackgroundColor: '#8b5cf6',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    ticks: { color: textColor, stepSize: 1 },
+                    grid: { color: gridColor },
+                    angleLines: { color: gridColor },
+                    pointLabels: { color: textColor, font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════
+// EN ÇOK KONU
+// ═══════════════════════════════════════════
+
+function renderTopTopics(topics) {
+    const container = document.getElementById('top-topics-list');
+    if (!container) return;
+    
+    if (topics.length === 0) {
+        container.innerHTML = '<p class="empty-text">Henüz hiç konu yok. Bir PDF yükleyerek başla!</p>';
+        return;
+    }
+    
+    const maxCount = Math.max(...topics.map(t => t.count));
+    
+    container.innerHTML = topics.map((topic, idx) => {
+        const percentage = (topic.count / maxCount) * 100;
+        const colors = ['#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f59e0b'];
+        const color = colors[idx % colors.length];
+        
+        return `
+            <div class="topic-row">
+                <div class="topic-row-header">
+                    <span class="topic-row-rank">#${idx + 1}</span>
+                    <span class="topic-row-name">${escapeHtml(topic.name)}</span>
+                    <span class="topic-row-count">${topic.count} soru</span>
+                </div>
+                <div class="topic-row-bar">
+                    <div class="topic-row-fill" style="width: ${percentage}%; background: ${color};"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════
+// ACHIEVEMENTS
+// ═══════════════════════════════════════════
+
+function renderAchievements(achievements) {
+    const container = document.getElementById('achievements-grid');
+    if (!container) return;
+    
+    if (achievements.length === 0) {
+        container.innerHTML = '<p class="empty-text">Henüz başarın yok. Bir PDF yükleyerek başla!</p>';
+        return;
+    }
+    
+    container.innerHTML = achievements.map(ach => `
+        <div class="achievement-card achievement-unlocked">
+            <div class="achievement-icon">${ach.icon}</div>
+            <div class="achievement-title">${escapeHtml(ach.title)}</div>
+            <div class="achievement-desc">${escapeHtml(ach.description)}</div>
+        </div>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════
+// SON DÖKÜMANLAR
+// ═══════════════════════════════════════════
+
+function renderRecentDocs(docs) {
+    const container = document.getElementById('recent-docs-list');
+    if (!container) return;
+    
+    if (docs.length === 0) {
+        container.innerHTML = '<p class="empty-text">Henüz hiç doküman yok.</p>';
+        return;
+    }
+    
+    container.innerHTML = docs.map(doc => `
+        <a href="/document/${doc.id}" class="recent-doc-item">
+            <div class="recent-doc-icon">📄</div>
+            <div class="recent-doc-info">
+                <div class="recent-doc-name">${escapeHtml(doc.filename)}</div>
+                <div class="recent-doc-meta">${doc.question_count} soru • ${doc.uploaded_at}</div>
+            </div>
+            <div class="recent-doc-arrow">→</div>
+        </a>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════
+// HELPER
+// ═══════════════════════════════════════════
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Sayfa yüklendiğinde
+window.addEventListener('load', loadDashboard);
+</script>
+
+{% endblock %}

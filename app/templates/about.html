@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="about-hero">
+    <div class="container">
+        <div class="hero-badge">
+            🎓 Bitirme Projesi
+        </div>
+        <h1>EduScan Hakkında</h1>
+        <p class="hero-subtitle">
+            Yapay zeka destekli, akademik kaliteli sınav hazırlık sistemi
+        </p>
+    </div>
+</section>
+
+<section class="about-content">
+    <div class="about-card">
+        <h2>🎯 Proje Amacı</h2>
+        <p>
+            EduScan, üniversite öğrencilerinin sınavlara hazırlanırken karşılaştığı 
+            <strong>"yeterince çeşitli soru bulamama"</strong> sorununu çözmek için geliştirilmiştir.
+        </p>
+        <p>
+            Öğrenci sadece bir ders notu, kitap sayfası veya sınav sorusu yüklüyor; sistem 
+            yapay zeka ile içeriği analiz edip, <strong>üniversite seviyesinde özgün sorular ve adım adım çözümler</strong> 
+            üretiyor.
+        </p>
+    </div>
+    
+    <div class="about-card">
+        <h2>✨ Öne Çıkan Özellikler</h2>
+        <ul class="feature-list">
+            <li>🤖 <strong>Yapay Zeka:</strong> Google Gemini 2.5 ile gelişmiş görüntü ve metin analizi</li>
+            <li>✍️ <strong>El Yazısı Anlama:</strong> Karmaşık el yazısı notları ve matematik formüllerini doğru okur</li>
+            <li>🎓 <strong>Akademik Kalite:</strong> Üniversite final sınavı seviyesinde açık uçlu sorular</li>
+            <li>📐 <strong>Pedagojik Çözüm:</strong> Her adımda "neden" sorusunun cevabıyla açıklamalar</li>
+            <li>📷 <strong>Görsel Kaynak Referansı:</strong> Üretilen sorunun esinlenildiği orijinal bölgeyi gösterir</li>
+            <li>🎬 <strong>Video Çözüm:</strong> Tahta önünde hoca anlatıyormuş gibi animasyonlu çözüm</li>
+            <li>📊 <strong>SVG Grafik:</strong> Gerektiğinde otomatik grafik üretimi</li>
+            <li>⚡ <strong>Canlı Takip:</strong> SSE teknolojisi ile gerçek zamanlı işlem durumu</li>
+            <li>📥 <strong>PDF Dışa Aktarma:</strong> Üretilen soruları PDF olarak indir, çalış</li>
+            <li>🔒 <strong>Güvenli:</strong> Her kullanıcının verileri kendine ait</li>
+        </ul>
+    </div>
+    
+    <div class="about-card">
+        <h2>🛠️ Kullanılan Teknolojiler</h2>
+        <div class="tech-grid">
+            <div class="tech-item">
+                <div class="tech-icon">🐍</div>
+                <div class="tech-name">Python</div>
+                <div class="tech-desc">Backend dili</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">🌶️</div>
+                <div class="tech-name">Flask</div>
+                <div class="tech-desc">Web framework</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">🗄️</div>
+                <div class="tech-name">SQLite</div>
+                <div class="tech-desc">Veritabanı</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">🤖</div>
+                <div class="tech-name">Google Gemini</div>
+                <div class="tech-desc">Yapay zeka API</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">∑</div>
+                <div class="tech-name">MathJax</div>
+                <div class="tech-desc">Matematik render</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">⚡</div>
+                <div class="tech-name">SSE</div>
+                <div class="tech-desc">Canlı stream</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">🎨</div>
+                <div class="tech-name">HTML/CSS</div>
+                <div class="tech-desc">Modern arayüz</div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon">📄</div>
+                <div class="tech-name">ReportLab</div>
+                <div class="tech-desc">PDF üretimi</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="about-card">
+        <h2>👨‍💻 Geliştirici</h2>
+        <div class="developer-info">
+            <div class="developer-avatar">🧑‍🎓</div>
+            <div class="developer-details">
+                <h3>Eren Aktaş</h3>
+                <p>Bilgisayar Mühendisliği — Bitirme Projesi</p>
+                <p class="developer-tag">Anadolu Üniversitesi</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="about-card about-cta">
+        <h2>🚀 Hadi Başlayalım</h2>
+        <p>Hemen bir ders notu yükle, EduScan'in farkını gör.</p>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary" style="display: inline-block; width: auto; padding: 0.75rem 2rem;">
+            📤 Yükleme Yap
+        </a>
+        {% else %}
+        <a href="{{ url_for('main.register') }}" class="btn btn-primary" style="display: inline-block; width: auto; padding: 0.75rem 2rem;">
+            📝 Ücretsiz Kayıt Ol
+        </a>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

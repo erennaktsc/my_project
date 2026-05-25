@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="processing-wrapper">
+    <div class="processing-card">
+        <h1>🤖 Yapay Zeka Çalışıyor</h1>
+        <p class="processing-subtitle">Dosyan analiz ediliyor, lütfen bekle...</p>
+        
+        <div class="progress-bar-wrapper">
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0%</div>
+        </div>
+        
+        <div class="current-step" id="current-step">
+            <div class="spinner"></div>
+            <span id="step-text">Hazırlanıyor...</span>
+        </div>
+        
+        <div class="detected-info" id="detected-info" style="display: none;">
+            <h3>🎯 Tespit Edilen Bilgiler</h3>
+            
+            <div class="info-item" id="topic-row" style="display: none;">
+                <span class="info-label">📚 Konu:</span>
+                <span class="info-value" id="detected-topic">-</span>
+            </div>
+            
+            <div class="info-item" id="subtopics-row" style="display: none;">
+                <span class="info-label">📑 Alt Başlıklar:</span>
+                <div class="info-value">
+                    <div class="subtopics-list" id="detected-subtopics"></div>
+                </div>
+            </div>
+            
+            <div class="info-item" id="level-row" style="display: none;">
+                <span class="info-label">📊 Seviye:</span>
+                <span class="info-value" id="detected-level">-</span>
+            </div>
+            
+            <div class="info-item" id="type-row" style="display: none;">
+                <span class="info-label">📝 İçerik Tipi:</span>
+                <span class="info-value" id="detected-type">-</span>
+            </div>
+            
+            <div class="verify-notice">
+                ⚠️ Bilgiler yanlış mı görünüyor? 
+                <a href="{{ url_for('main.index') }}">İptal et ve farklı bir dosya yükle</a>
+            </div>
+        </div>
+        
+        <div class="error-box" id="error-box" style="display: none;">
+    <div class="error-icon" id="error-icon">⚠️</div>
+    <h3 id="error-title">Bir Sorun Oluştu</h3>
+    <p id="error-text" class="error-message"></p>
+    
+    <div class="error-actions">
+        <button onclick="window.location.reload()" class="btn btn-primary" id="error-retry-btn">
+            🔄 Tekrar Dene
+        </button>
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+            🏠 Ana Sayfaya Dön
+        </a>
+    </div>
+    
+    <details class="error-technical">
+        <summary>🔍 Teknik Detaylar</summary>
+        <code id="error-technical-text"></code>
+    </details>
+</div>
+    </div>
+</div>
+
+<script>
+const jobId = "{{ job.id }}";
+const evtSource = new EventSource("{{ url_for('main.job_stream', job_id=job.id) }}");
+
+evtSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    
+    // Progress bar güncelle
+    document.getElementById('progress-fill').style.width = data.progress + '%';
+    document.getElementById('progress-text').textContent = data.progress + '%';
+    
+    // Mevcut adım
+    document.getElementById('step-text').textContent = data.current_step || '...';
+    
+    // Tespit edilen bilgiler
+    if (data.detected_topic) {
+        document.getElementById('detected-info').style.display = 'block';
+        document.getElementById('detected-topic').textContent = data.detected_topic;
+        document.getElementById('topic-row').style.display = 'flex';
+    }
+    
+    if (data.detected_subtopics) {
+        try {
+            const subtopics = JSON.parse(data.detected_subtopics);
+            if (subtopics.length > 0) {
+                const container = document.getElementById('detected-subtopics');
+                container.innerHTML = '';
+                subtopics.forEach(st => {
+                    const tag = document.createElement('span');
+                    tag.className = 'subtopic-tag';
+                    tag.textContent = st;
+                    container.appendChild(tag);
+                });
+                document.getElementById('subtopics-row').style.display = 'flex';
+            }
+        } catch(e) {}
+    }
+    
+    if (data.detected_level) {
+        document.getElementById('detected-level').textContent = data.detected_level.replace(/_/g, ' ');
+        document.getElementById('level-row').style.display = 'flex';
+    }
+    
+    if (data.content_type) {
+        document.getElementById('detected-type').textContent = data.content_type.replace(/_/g, ' ');
+        document.getElementById('type-row').style.display = 'flex';
+    }
+    
+    // Tamamlandı mı?
+    if (data.status === 'completed' && data.document_id) {
+        evtSource.close();
+        setTimeout(() => {
+            window.location.href = "/document/" + data.document_id;
+        }, 1000);
+    }
+    
+    // Hata mı?
+    if (data.status === 'error') {
+    showError(data.error_message);
+}
+
+function showError(errorMessage) {
+    const errorBox = document.getElementById('error-box');
+    const errorTitle = document.getElementById('error-title');
+    const errorText = document.getElementById('error-text');
+    const errorIcon = document.getElementById('error-icon');
+    const technicalText = document.getElementById('error-technical-text');
+    
+    // Format: "🔧 Başlık: Mesaj"
+    // Icon + title + message ayırmaya çalış
+    const iconMatch = errorMessage.match(/^([\u{1F000}-\u{1FFFF}⚠️🔧📤📄⏳🚦🚫🌐])\s*([^:]+):\s*(.+)$/u);
+    
+    if (iconMatch) {
+        errorIcon.textContent = iconMatch[1];
+        errorTitle.textContent = iconMatch[2].trim();
+        errorText.textContent = iconMatch[3].trim();
+    } else {
+        // Fallback: eski format
+        errorIcon.textContent = '⚠️';
+        errorTitle.textContent = 'Bir Sorun Oluştu';
+        errorText.textContent = errorMessage;
+    }
+    
+    technicalText.textContent = errorMessage;
+    errorBox.style.display = 'block';
+    
+    // İlerleme kutusunu gizle
+    const currentStep = document.querySelector('.current-step');
+    if (currentStep) currentStep.style.display = 'none';
+}
+};
+
+evtSource.onerror = function() {
+    console.log('SSE connection error - retrying...');
+};
+</script>
+{% endblock %}

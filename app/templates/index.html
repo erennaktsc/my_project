@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- ═══ HERO SECTION ═══ -->
+<section class="hero">
+    <div class="container">
+        <div class="hero-badge">
+            ✨ Yapay Zeka Destekli Eğitim Aracı
+        </div>
+        <h1>Notlarını Sınav Sorularına Dönüştür</h1>
+        <p class="hero-subtitle">
+            PDF ve görüntüleri yükle, yapay zeka senin için <strong>üniversite seviyesinde akademik sorular</strong> üretsin. 
+            Her soru için adım adım çözüm, ipucu ve kaynak referansı.
+        </p>
+    </div>
+</section>
+
+<!-- ═══ UPLOAD CARD ═══ -->
+<section class="upload-section">
+    <div class="upload-card">
+        <h2>📤 Yeni Doküman Yükle</h2>
+        <p class="upload-subtitle">
+            Ders notu, soru çözümü veya konu anlatımı yükle — gerisini bize bırak.
+        </p>
+        
+        <form action="{{ url_for('main.upload') }}" method="POST" enctype="multipart/form-data" id="upload-form">
+            <div class="file-input-wrapper" onclick="document.getElementById('file-input').click()">
+                <input type="file" id="file-input" name="file" accept=".pdf,.png,.jpg,.jpeg" required onchange="updateFileName(this)">
+                <div class="file-input-label">
+                    <span class="file-input-icon">📎</span>
+                    <span id="file-name-display">Dosya seç (PNG, JPG, PDF)</span>
+        </div>
+    </div>
+    
+    <!-- YENİ: Soru sayısı seçimi -->
+     <!-- YENİ: Bloom Taksonomisi (opsiyonel) -->
+    <div class="bloom-selector">
+        <details class="bloom-details">
+            <summary class="bloom-summary">
+                <span class="bloom-toggle-icon">🎓</span>
+                <span class="bloom-toggle-text">Gelişmiş: Bloom Taksonomisi Seç</span>
+                <span class="bloom-toggle-hint">(opsiyonel - boş bırakırsan karışık üretir)</span>
+            </summary>
+            
+            <div class="bloom-content">
+                <p class="bloom-info">
+                    💡 Hangi düşünme seviyesinde sorular istiyorsun? Birden fazla seçebilirsin.
+                </p>
+                
+                <div class="bloom-levels">
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="hatirlama">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">🧠</span>
+                            <span class="bloom-name">Hatırlama</span>
+                            <span class="bloom-desc">Tanımlama, listeleme</span>
+                        </span>
+                    </label>
+                    
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="anlama">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">💡</span>
+                            <span class="bloom-name">Anlama</span>
+                            <span class="bloom-desc">Açıklama, özetleme</span>
+                        </span>
+                    </label>
+                    
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="uygulama">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">🔧</span>
+                            <span class="bloom-name">Uygulama</span>
+                            <span class="bloom-desc">Hesaplama, çözme</span>
+                        </span>
+                    </label>
+                    
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="analiz">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">🔍</span>
+                            <span class="bloom-name">Analiz</span>
+                            <span class="bloom-desc">Karşılaştırma, ilişki</span>
+                        </span>
+                    </label>
+                    
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="degerlendirme">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">⚖️</span>
+                            <span class="bloom-name">Değerlendirme</span>
+                            <span class="bloom-desc">Eleştirme, yargılama</span>
+                        </span>
+                    </label>
+                    
+                    <label class="bloom-level">
+                        <input type="checkbox" name="bloom_levels" value="yaratma">
+                        <span class="bloom-label">
+                            <span class="bloom-icon">🎨</span>
+                            <span class="bloom-name">Yaratma</span>
+                            <span class="bloom-desc">Tasarlama, üretme</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </details>
+    </div>
+    <div class="question-count-selector">
+        <label class="selector-label">📝 Kaç soru üretmek istersin?</label>
+        <div class="count-options">
+            <label class="count-option">
+                <input type="radio" name="num_questions" value="3" checked>
+                <span class="count-label">
+                    <span class="count-number">3</span>
+                    <span class="count-desc">Hızlı</span>
+                </span>
+            </label>
+            <label class="count-option">
+                <input type="radio" name="num_questions" value="5">
+                <span class="count-label">
+                    <span class="count-number">5</span>
+                    <span class="count-desc">Önerilen</span>
+                </span>
+            </label>
+            <label class="count-option">
+                <input type="radio" name="num_questions" value="10">
+                <span class="count-label">
+                    <span class="count-number">10</span>
+                    <span class="count-desc">Detaylı</span>
+                </span>
+            </label>
+        </div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">
+        🚀 Yükle ve Analiz Et
+    </button>
+    
+    <p class="upload-info">
+        ⏱ İşlem 30-60 saniye sürebilir, lütfen bekleyiniz.
+    </p>
+</form>
+    </div>
+</section>
+
+<!-- ═══ RECENT DOCUMENTS ═══ -->
+{% if documents %}
+<section class="recent-section">
+    <h2>📚 Son Yüklediklerin</h2>
+    <div class="recent-list">
+        {% for doc in documents %}
+        <a href="{{ url_for('main.view_document', doc_id=doc.id) }}" class="recent-item">
+            <div class="recent-item-name">
+                {% if doc.file_type == 'pdf' %}📄{% else %}🖼️{% endif %}
+                {{ doc.filename }}
+            </div>
+            <div class="recent-item-date">
+                📅 {{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') }}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<!-- ═══ FEATURES SECTION ═══ -->
+<section class="features">
+    <div class="section-header">
+        <h2>Neden EduScan?</h2>
+        <p>Geleneksel soru üreticilerinden farklı yanlarımız</p>
+    </div>
+    
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">🎓</div>
+            <h3>Üniversite Seviyesi Sorular</h3>
+            <p>Çoktan seçmeli değil, gerçek üniversite final sınavlarında çıkacak kalitede açık uçlu sorular üretir.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">✍️</div>
+            <h3>El Yazısı + Matematik Anlama</h3>
+            <p>Karmaşık el yazısı notları, matematik formülleri ve grafikleri doğru şekilde okur ve yorumlar.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">📐</div>
+            <h3>Adım Adım Çözüm</h3>
+            <p>Her sorunun çözümü, hangi kuralı neden uyguladığını açıklayan pedagojik adımlarla sunulur.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">🎬</div>
+            <h3>Video Çözüm</h3>
+            <p>Çözümleri tahta önünde hoca anlatıyormuş gibi izleyebilirsin — adım adım, hızlı ve net.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">📷</div>
+            <h3>Görsel Kaynak Referansı</h3>
+            <p>Üretilen her soru için, orijinal dökümandaki esinlenildiği bölgenin görüntüsünü gösterir.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">🧠</div>
+            <h3>Akıllı Konu Analizi</h3>
+            <p>Konunun alt başlıklarını, ön gereksinimlerini ve öğrencilerin tipik hatalarını otomatik tespit eder.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Gerçek Zamanlı Takip</h3>
+            <p>Yapay zeka çalışırken canlı olarak hangi adımda olduğunu, neyi tespit ettiğini görebilirsin.</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Güvenli ve Kişisel</h3>
+            <p>Yüklediğin dökümanlar ve üretilen sorular sadece sana ait. Hesabınla giriş yapmadan kimse göremez.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ FAQ SECTION ═══ -->
+<section class="faq">
+    <div class="section-header">
+        <h2>Sıkça Sorulan Sorular</h2>
+        <p>Merak ettiklerin burada cevaplanıyor</p>
+    </div>
+    
+    <details class="faq-item">
+        <summary>Hangi tür dosyaları yükleyebilirim?</summary>
+        <p>Şu an PNG, JPG, JPEG görüntü dosyaları ve PDF dosyaları desteklenmektedir. El yazısı notlar, ders kitabı sayfaları, sınav soruları gibi her türlü akademik içerik yükleyebilirsin.</p>
+    </details>
+    
+    <details class="faq-item">
+        <summary>Üretilen sorular ne tür olur?</summary>
+        <p>EduScan, üniversite seviyesinde <strong>açık uçlu</strong> sorular üretir. Çoktan seçmeli soru üretmez. Sorular hesaplama, ispat, türetme, analiz, yorumlama ve uygulama tiplerinde olur — yani gerçek bir final sınavındaki gibi.</p>
+    </details>
+    
+    <details class="faq-item">
+        <summary>Soru üretimi ne kadar sürer?</summary>
+        <p>Yüklenen dökümanın boyutuna ve karmaşıklığına bağlı olarak, ortalama 30-90 saniye sürer. İşlem sırasında ilerleme durumunu canlı olarak görebilirsin.</p>
+    </details>
+    
+    <details class="faq-item">
+        <summary>Matematik formüllerini destekliyor mu?</summary>
+        <p>Evet, EduScan MathJax kullanarak matematik formüllerini profesyonel olarak render eder. İntegral, türev, matris, küme gösterimi, Yunan harfleri ve LaTeX'in tüm özellikleri desteklenir.</p>
+    </details>
+    
+    <details class="faq-item">
+        <summary>Dökümanlarım güvende mi?</summary>
+        <p>Evet. Tüm dökümanların hesabına bağlıdır ve sadece sen erişebilirsin. Diğer kullanıcılar veya ziyaretçiler senin dökümanlarını göremez.</p>
+    </details>
+    
+    <details class="faq-item">
+        <summary>Üretilen soruların kalitesi nasıl?</summary>
+        <p>Sorular, 20+ yıllık deneyimli üniversite öğretim üyesi prompt'uyla üretilir. Her soru için ölçülen kavram, çözüm adımları, doğru cevap ve ipucu belirtilir. Ayrıca her soru orijinal dökümanın hangi kısmından esinlenildiği gösterilir.</p>
+    </details>
+</section>
+
+<script>
+function updateFileName(input) {
+    const display = document.getElementById('file-name-display');
+    if (input.files && input.files[0]) {
+        display.textContent = '✓ ' + input.files[0].name;
+        display.style.color = 'var(--primary)';
+        display.style.fontWeight = '600';
+    }
+}
+</script>
+
+{% endblock %}

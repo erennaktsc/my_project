@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="study-container" data-mode="{{ mode }}">
+    
+    <!-- Header -->
+    <div class="study-header">
+        <a href="{{ url_for('main.flashcards_page') }}" class="back-link">← Geri</a>
+        <div class="study-progress">
+            <span id="cards-studied">0</span> kart tamamlandı
+        </div>
+        <button onclick="endSession()" class="end-btn">🏁 Bitir</button>
+    </div>
+    
+    <!-- Loading -->
+    <div id="loading-state" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Kart yükleniyor...</p>
+    </div>
+    
+    <!-- Empty -->
+    <div id="empty-state" class="empty-state-card" style="display: none;">
+        <div class="empty-icon">🎉</div>
+        <h2>Harika İş Çıkardın!</h2>
+        <p>Bu modda çalışılacak kart kalmadı.</p>
+        <div class="empty-actions">
+            <a href="{{ url_for('main.flashcards_page') }}" class="btn-secondary-large">
+                ← Ana Sayfaya
+            </a>
+            <button onclick="window.location.reload()" class="btn-primary-large">
+                🔄 Tekrar Dene
+            </button>
+        </div>
+    </div>
+    
+    <!-- Card Container -->
+    <div id="card-container" class="card-container" style="display: none;">
+        
+        <!-- Card Info -->
+        <div class="card-info">
+            <span class="info-badge info-topic" id="info-topic">📚 Konu</span>
+            <span class="info-badge info-difficulty" id="info-difficulty">orta</span>
+            <span class="info-badge info-bloom" id="info-bloom" style="display:none;">🔧 Uygulama</span>
+            <button class="favorite-btn-study" id="fav-btn" onclick="toggleFavorite()" title="Favorile">
+                <span id="fav-icon">☆</span>
+            </button>
+        </div>
+        <!-- Cevabı Gör + Atla Butonları (kart çevrilmediğinde görünür) -->
+        <div class="show-answer-section" id="show-answer-section">
+            <p class="show-answer-hint">💭 Cevabı düşündün mü? Hazırsan çevir veya atla:</p>
+            <div class="action-buttons-wrapper">
+                <button class="btn-show-answer" onclick="flipCard()">
+                    <span class="show-answer-icon">🔄</span>
+                    <span>Cevabı Göster</span>
+                    <kbd>Boşluk</kbd>
+                </button>
+                <button class="btn-skip-card" onclick="skipCard()" title="Bu kartı atla (değerlendirmeden geç)">
+                    <span>⏭️</span>
+                    <span>Atla</span>
+                    <kbd>S</kbd>
+                </button>
+            </div>
+        </div>
+        <!-- Flashcard -->
+        <div class="flashcard" id="flashcard" onclick="flipCard()">
+            
+            <!-- Front (Question) -->
+            <div class="flashcard-side flashcard-front">
+                <div class="card-label">
+                    <span>📝 SORU</span>
+                    <span class="card-hint-text">Soruyu okuyup düşün, sonra çevir</span>
+                </div>
+                <div class="card-content" id="card-question"></div>
+                <div id="card-graph-front" style="display:none;"></div>
+                
+                <button class="hint-btn" onclick="event.stopPropagation(); showHint()" id="hint-btn" style="display:none;">
+                    💡 İpucu Göster
+                </button>
+                <div id="hint-content" class="hint-content-flashcard" style="display:none;"></div>
+                
+                <div class="flip-hint">
+                    🔄 Çevirmek için <kbd>Boşluk</kbd> bas veya tıkla
+                </div>
+            </div>
+            
+            <!-- Back (Answer) -->
+            <div class="flashcard-side flashcard-back">
+                <div class="card-label">
+                    <span>✅ CEVAP VE ÇÖZÜM</span>
+                </div>
+                
+                <div class="answer-section">
+                    <h4>📋 Çözüm Adımları:</h4>
+                    <div id="card-solution" class="solution-text"></div>
+                </div>
+                
+                <div class="answer-section answer-final">
+                    <h4>✓ Doğru Cevap:</h4>
+                    <div id="card-answer" class="math-content"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Rating Buttons (only on back side) -->
+        <!-- Rating Buttons (cevap göründükten sonra çıkar) -->
+        <div class="rating-section" id="rating-section" style="display: none;">
+            <div class="rating-header">
+                <h3>🎯 Bu Soruyu Nasıl Hatırladın?</h3>
+                <p class="rating-prompt">Aşağıdaki butonlardan birini seç. Sistem cevabına göre kartı tekrar göstereceğin zamanı belirler.</p>
+            </div>
+            
+            <div class="rating-buttons">
+                <button class="rating-btn rating-again" onclick="rateCard('again')">
+                    <span class="rating-key-badge">1</span>
+                    <span class="rating-emoji">😖</span>
+                    <span class="rating-label">Hiç Bilmiyordum</span>
+                    <span class="rating-interval">📅 ~1 gün sonra tekrar</span>
+                </button>
+                
+                <button class="rating-btn rating-hard" onclick="rateCard('hard')">
+                    <span class="rating-key-badge">2</span>
+                    <span class="rating-emoji">😅</span>
+                    <span class="rating-label">Zor Hatırladım</span>
+                    <span class="rating-interval">📅 ~3 gün sonra tekrar</span>
+                </button>
+                
+                <button class="rating-btn rating-good" onclick="rateCard('good')">
+                    <span class="rating-key-badge">3</span>
+                    <span class="rating-emoji">🙂</span>
+                    <span class="rating-label">Hatırladım</span>
+                    <span class="rating-interval">📅 ~6 gün sonra tekrar</span>
+                </button>
+                
+                <button class="rating-btn rating-easy" onclick="rateCard('easy')">
+                    <span class="rating-key-badge">4</span>
+                    <span class="rating-emoji">😎</span>
+                    <span class="rating-label">Çok Kolay</span>
+                    <span class="rating-interval">📅 ~2 hafta sonra</span>
+                </button>
+            </div>
+            
+            <p class="rating-tip">
+                💡 <strong>İpucu:</strong> Klavyeden <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd>, <kbd>4</kbd> tuşlarına basarak da seçebilirsin.
+            </p>
+            
+            <div class="skip-rating-section">
+                <button class="btn-skip-rating" onclick="skipCard()" title="Değerlendirmeden geç">
+                    <span>⏭️</span>
+                    <span>Değerlendirmeden Geç</span>
+                    <kbd>S</kbd>
+                </button>
+                <p class="skip-rating-hint">Bu kartı değerlendirmeden geçersen sistem öğrenme aralığını güncellemez.</p>
+            </div>
+        </div>
+</div>
+
+<!-- Keyboard hints -->
+<div class="keyboard-hints">
+    <kbd>Boşluk</kbd> Çevir &nbsp; • &nbsp; 
+    <kbd>1</kbd>-<kbd>4</kbd> Değerlendir &nbsp; • &nbsp; 
+    <kbd>S</kbd> Atla &nbsp; • &nbsp; 
+    <kbd>F</kbd> Favori &nbsp; • &nbsp; 
+    <kbd>H</kbd> İpucu &nbsp; • &nbsp; 
+    <kbd>Esc</kbd> Çıkış
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// FLASHCARD STATE
+// ═══════════════════════════════════════════
+
+let currentCard = null;
+let isFlipped = false;
+let cardsStudied = 0;
+const mode = document.querySelector('.study-container').dataset.mode;
+
+// ═══════════════════════════════════════════
+// API CALLS
+// ═══════════════════════════════════════════
+
+async function loadNextCard() {
+    console.log('🔄 Sıradaki kart yükleniyor... (mode:', mode, ')');
+    showLoading();
+    
+    try {
+        const response = await fetch(`/api/flashcards/next?mode=${mode}`);
+        console.log('📥 Next yanıtı status:', response.status);
+        
+        const data = await response.json();
+        console.log('📥 Next yanıtı data:', data);
+        
+        if (!data.success) {
+            console.error('❌ Backend hata:', data);
+            showEmpty();
+            return;
+        }
+        
+        if (!data.has_card) {
+            console.log('ℹ️ Bu modda kart kalmadı');
+            showEmpty();
+            return;
+        }
+        
+        currentCard = data.card;
+        console.log('✅ Yeni kart yüklendi:', currentCard.question_id);
+        renderCard();
+    } catch (error) {
+        console.error('❌ Kart yüklenemedi:', error);
+        showEmpty();
+    }
+}
+// ═══════════════════════════════════════════
+// KART ATLAMA — Değerlendirmeden geç
+// ═══════════════════════════════════════════
+
+function skipCard() {
+    if (!currentCard) return;
+    
+    console.log('⏭️ Kart atlandı, sıradaki yükleniyor...');
+    
+    // Atlama animasyonu
+    const card = document.getElementById('flashcard');
+    if (card) {
+        card.style.transition = 'all 0.3s ease';
+        card.style.opacity = '0.5';
+        card.style.transform = 'translateX(-30px)';
+    }
+    
+    // Kısa gecikme sonrası yeni kart yükle
+    setTimeout(() => {
+        if (card) {
+            card.style.opacity = '';
+            card.style.transform = '';
+        }
+        loadNextCard();
+    }, 250);
+}
+
+async function rateCard(rating) {
+    if (!currentCard) {
+        console.warn('⚠️ currentCard yok, rate çağrısı iptal');
+        return;
+    }
+    
+    console.log('📤 Rate gönderiliyor:', { 
+        question_id: currentCard.question_id, 
+        rating: rating 
+    });
+    
+    try {
+        const response = await fetch('/api/flashcards/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question_id: currentCard.question_id,
+                rating: rating
+            })
+        });
+        
+        console.log('📥 Rate yanıtı status:', response.status);
+        
+        const data = await response.json();
+        console.log('📥 Rate yanıtı data:', data);
+        
+        if (data.success) {
+            cardsStudied++;
+            document.getElementById('cards-studied').textContent = cardsStudied;
+            console.log('✅ Rate başarılı, sıradaki kart yükleniyor...');
+            
+            // Bir sonrakini yükle (hemen, bekleme yok)
+            await loadNextCard();
+        } else {
+            console.error('❌ Rate başarısız:', data.error);
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('❌ Rate hatası:', error);
+        alert('Bağlantı hatası: ' + error.message);
+    }
+}
+
+async function toggleFavorite() {
+    if (!currentCard) return;
+    
+    try {
+        const response = await fetch('/api/favorite/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question_id: currentCard.question_id })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const icon = document.getElementById('fav-icon');
+            const btn = document.getElementById('fav-btn');
+            
+            if (data.is_favorite) {
+                icon.textContent = '⭐';
+                btn.classList.add('is-favorite-study');
+            } else {
+                icon.textContent = '☆';
+                btn.classList.remove('is-favorite-study');
+            }
+        }
+    } catch (error) {
+        console.error('Favori hatası:', error);
+    }
+}
+
+// ═══════════════════════════════════════════
+// UI FUNCTIONS
+// ═══════════════════════════════════════════
+
+function showLoading() {
+    document.getElementById('loading-state').style.display = 'flex';
+    document.getElementById('card-container').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'none';
+}
+
+function showEmpty() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('card-container').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'flex';
+}
+
+function renderCard() {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('card-container').style.display = 'block';
+    document.getElementById('empty-state').style.display = 'none';
+    
+    // YENİ: Sayfayı en üste kaydır (yeni kart için)
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Reset flip
+    isFlipped = false;
+    document.getElementById('flashcard').classList.remove('flipped');
+    document.getElementById('rating-section').style.display = 'none';
+    document.getElementById('hint-content').style.display = 'none';
+    const showAnswerSection = document.getElementById('show-answer-section');
+    if (showAnswerSection) showAnswerSection.style.display = 'block';
+    
+    // Topic
+    document.getElementById('info-topic').textContent = '📚 ' + currentCard.topic_name;
+    
+    // Difficulty
+    const diffEl = document.getElementById('info-difficulty');
+    diffEl.textContent = currentCard.difficulty.toUpperCase();
+    diffEl.className = 'info-badge info-difficulty difficulty-' + currentCard.difficulty;
+    
+    // Bloom (varsa)
+    const bloomEl = document.getElementById('info-bloom');
+    if (currentCard.bloom_level) {
+        const bloomMap = {
+            'hatirlama': '🧠 Hatırlama',
+            'anlama': '💡 Anlama',
+            'uygulama': '🔧 Uygulama',
+            'analiz': '🔍 Analiz',
+            'degerlendirme': '⚖️ Değerlendirme',
+            'yaratma': '🎨 Yaratma'
+        };
+        bloomEl.textContent = bloomMap[currentCard.bloom_level] || '🎓 ' + currentCard.bloom_level;
+        bloomEl.style.display = 'inline-flex';
+    } else {
+        bloomEl.style.display = 'none';
+    }
+    
+    // Favorite
+    const favIcon = document.getElementById('fav-icon');
+    const favBtn = document.getElementById('fav-btn');
+    if (currentCard.is_favorite) {
+        favIcon.textContent = '⭐';
+        favBtn.classList.add('is-favorite-study');
+    } else {
+        favIcon.textContent = '☆';
+        favBtn.classList.remove('is-favorite-study');
+    }
+    
+    // Question
+    document.getElementById('card-question').innerHTML = currentCard.question_text;
+    
+    // Hint
+    const hintBtn = document.getElementById('hint-btn');
+    if (currentCard.hint && currentCard.hint.trim()) {
+        hintBtn.style.display = 'inline-block';
+        document.getElementById('hint-content').innerHTML = currentCard.hint;
+    } else {
+        hintBtn.style.display = 'none';
+    }
+    
+    // Solution
+    const solutionEl = document.getElementById('card-solution');
+    const steps = currentCard.solution_steps.split('\n').filter(s => s.trim());
+    solutionEl.innerHTML = '<ol>' + steps.map(s => '<li>' + s + '</li>').join('') + '</ol>';
+    
+    // Answer
+    document.getElementById('card-answer').innerHTML = currentCard.correct_answer;
+    
+    // Graph (varsa)
+    if (currentCard.has_graph && currentCard.graph_svg) {
+        document.getElementById('card-graph-front').innerHTML = currentCard.graph_svg;
+        document.getElementById('card-graph-front').style.display = 'block';
+    } else {
+        document.getElementById('card-graph-front').style.display = 'none';
+    }
+    
+    // MathJax
+    if (window.MathJax) {
+        setTimeout(() => MathJax.typesetPromise(), 100);
+    }
+}
+
+function flipCard() {
+    if (!currentCard) return;
+    
+    const card = document.getElementById('flashcard');
+    const ratingSection = document.getElementById('rating-section');
+    const showAnswerSection = document.getElementById('show-answer-section');
+    
+    isFlipped = !isFlipped;
+    
+    if (isFlipped) {
+        // Çevrildi - cevap görünüyor
+        card.classList.add('flipped');
+        
+        // "Cevabı Göster" butonunu gizle
+        if (showAnswerSection) showAnswerSection.style.display = 'none';
+        
+        // Rating butonlarını göster (scroll YOK, kullanıcı üstte kalır)
+        setTimeout(() => {
+            ratingSection.style.display = 'block';
+            if (window.MathJax) MathJax.typesetPromise();
+        }, 400);
+    } else {
+        // Geri döndü - soru görünüyor
+        card.classList.remove('flipped');
+        ratingSection.style.display = 'none';
+        if (showAnswerSection) showAnswerSection.style.display = 'block';
+    }
+}
+
+function showHint() {
+    document.getElementById('hint-content').style.display = 'block';
+    if (window.MathJax) MathJax.typesetPromise([document.getElementById('hint-content')]);
+}
+
+function endSession() {
+    if (cardsStudied > 0) {
+        alert(`🎉 Harika çalıştın! ${cardsStudied} kart tamamladın.`);
+    }
+    window.location.href = "{{ url_for('main.flashcards_page') }}";
+}
+
+// ═══════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════
+
+document.addEventListener('keydown', function(e) {
+    if (!currentCard) return;
+    
+    // Çıkış
+    if (e.key === 'Escape') {
+        endSession();
+        return;
+    }
+    
+    // YENİ: S → Atla
+    if (e.key === 's' || e.key === 'S') {
+        skipCard();
+        return;
+    }
+
+    // Boşluk → Çevir
+    if (e.key === ' ') {
+        e.preventDefault();
+        flipCard();
+        return;
+    }
+    
+    // F → Favori
+    if (e.key === 'f' || e.key === 'F') {
+        toggleFavorite();
+        return;
+    }
+    
+    // H → İpucu
+    if (e.key === 'h' || e.key === 'H') {
+        if (!isFlipped) showHint();
+        return;
+    }
+    
+    // 1-4 → Rate (sadece çevrilmişse)
+    if (isFlipped) {
+        if (e.key === '1') rateCard('again');
+        if (e.key === '2') rateCard('hard');
+        if (e.key === '3') rateCard('good');
+        if (e.key === '4') rateCard('easy');
+    }
+});
+
+// İlk yüklemede ilk kartı getir
+window.addEventListener('load', function() {
+    loadNextCard();
+});
+</script>
+
+{% endblock %}

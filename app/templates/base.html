@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduScan — Yapay Zeka Destekli Sınav Hazırlık Sistemi</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <script>
+       MathJax = {
+    loader: {
+        load: ['[tex]/ams', '[tex]/cases', '[tex]/color', '[tex]/cancel', '[tex]/mhchem', '[tex]/boldsymbol']
+    },
+    tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true,
+        packages: {
+            '[+]': ['ams', 'cases', 'color', 'cancel', 'mhchem', 'boldsymbol']
+        }
+    },
+    options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+    },
+    startup: {
+        ready: function() {
+            MathJax.startup.defaultReady();
+            console.log('✅ MathJax hazır (cases, ams, color paketleri yüklendi)');
+        }
+    }
+};
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container container">
+                <a href="{{ url_for('main.index') }}" class="logo">
+                    📚 EduScan
+                </a>
+                
+                <!-- Hamburger Menü Butonu (Mobile) -->
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Menü">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                
+                <ul class="nav-links" id="navLinks">
+                    {% if current_user.is_authenticated %}
+                        <li><a href="{{ url_for('main.index') }}">Ana Sayfa</a></li>
+                        <li><a href="{{ url_for('main.list_documents') }}">Geçmişim</a></li>
+                        <li><a href="{{ url_for('main.list_favorites') }}">⭐ Favorilerim</a></li>
+                        <li><a href="{{ url_for('main.flashcards_page') }}">🎴 Flashcard</a></li>
+                        <li><a href="{{ url_for('main.dashboard') }}">📊 İstatistik</a></li>
+                        <li><a href="{{ url_for('main.about') }}">Hakkında</a></li>
+                        <li>
+                            <button class="theme-toggle" onclick="toggleTheme()" title="Tema değiştir" aria-label="Karanlık/Aydınlık mod">
+                                <span class="theme-icon" id="theme-icon">🌙</span>
+                            </button>
+                        </li>
+                        <li class="nav-user">
+                            <span class="user-greeting">👋 {{ current_user.username }}</span>
+                            <a href="{{ url_for('main.logout') }}" class="logout-btn">Çıkış</a>
+                        </li>
+                    {% else %}
+                        <li><a href="{{ url_for('main.about') }}">Hakkında</a></li>
+                        <li>
+                            <button class="theme-toggle" onclick="toggleTheme()" title="Tema değiştir" aria-label="Karanlık/Aydınlık mod">
+                                <span class="theme-icon" id="theme-icon">🌙</span>
+                            </button>
+                        </li>
+                        <li><a href="{{ url_for('main.login') }}">Giriş Yap</a></li>
+                        <li><a href="{{ url_for('main.register') }}" class="nav-cta">Kayıt Ol</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p class="footer-tagline">📚 EduScan</p>
+            <p>Yapay Zeka Destekli Sınav Hazırlık Sistemi</p>
+            <p class="footer-copy">© 2026 EduScan — Bitirme Projesi</p>
+        </div>
+    </footer>
+    
+    <!-- ═══════════════════════════════════════════
+         FLOATING WIDGET - Arka Planda İş Takibi
+         ═══════════════════════════════════════════ -->
+    {% if current_user.is_authenticated %}
+    <div id="job-widget" class="job-widget" style="display: none;">
+        <div class="job-widget-header">
+            <span class="job-widget-title">
+                <span id="job-widget-icon">⏳</span>
+                <span id="job-widget-status-text">İşlemler</span>
+            </span>
+            <div class="job-widget-actions">
+                <button class="job-widget-minimize" onclick="toggleWidget()" title="Küçült/Büyüt">
+                    <span id="widget-toggle-icon">−</span>
+                </button>
+                <button class="job-widget-close" onclick="closeWidget()" title="Kapat">×</button>
+            </div>
+        </div>
+        
+        <div class="job-widget-body" id="job-widget-body">
+            <div id="jobs-list"></div>
+        </div>
+    </div>
+    
+    <script>
+        // ═══════════════════════════════════════════
+        // FLOATING WIDGET SYSTEM
+        // ═══════════════════════════════════════════
+        
+        let widgetMinimized = false;
+        let widgetClosed = false;
+        let pollInterval = null;
+        let lastJobsHash = '';
+        
+        async function fetchActiveJobs() {
+            if (widgetClosed) return;
+            
+            try {
+                const response = await fetch('/api/jobs/active');
+                const data = await response.json();
+                
+                if (!data.success) return;
+                
+                renderJobs(data.jobs);
+                updateWidgetVisibility(data);
+            } catch (error) {
+                console.error('Job fetch hatası:', error);
+            }
+        }
+        
+        function renderJobs(jobs) {
+            const list = document.getElementById('jobs-list');
+            const widget = document.getElementById('job-widget');
+            
+            const currentHash = JSON.stringify(jobs.map(j => `${j.job_id}-${j.status}-${j.progress}`));
+            if (currentHash === lastJobsHash) return;
+            lastJobsHash = currentHash;
+            
+            if (jobs.length === 0) {
+                list.innerHTML = '';
+                widget.style.display = 'none';
+                return;
+            }
+            
+            list.innerHTML = jobs.map(job => {
+                if (job.status === 'completed') {
+                    return `
+                        <div class="job-item job-item-completed" data-job-id="${job.job_id}">
+                            <div class="job-item-icon">✅</div>
+                            <div class="job-item-content">
+                                <div class="job-item-title">${escapeHtml(job.filename)}</div>
+                                <div class="job-item-subtitle">
+                                    ${job.detected_topic ? '📚 ' + escapeHtml(job.detected_topic) : 'Tamamlandı'}
+                                </div>
+                                <div class="job-item-actions">
+                                    <a href="/document/${job.document_id}" 
+                                       class="job-action-btn job-action-primary"
+                                       onclick="markJobSeen('${job.job_id}')">
+                                        📖 Soruları Gör
+                                    </a>
+                                    <button class="job-action-btn job-action-secondary"
+                                            onclick="markJobSeen('${job.job_id}', true)">
+                                        Kapat
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (job.status === 'error') {
+                    return `
+                        <div class="job-item job-item-error" data-job-id="${job.job_id}">
+                            <div class="job-item-icon">⚠️</div>
+                            <div class="job-item-content">
+                                <div class="job-item-title">${escapeHtml(job.filename)}</div>
+                                <div class="job-item-subtitle">Bir hata oluştu</div>
+                                <div class="job-item-actions">
+                                    <button class="job-action-btn job-action-secondary"
+                                            onclick="markJobSeen('${job.job_id}', true)">
+                                        Tamam
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="job-item job-item-active" data-job-id="${job.job_id}">
+                            <div class="job-item-icon">
+                                <div class="mini-spinner"></div>
+                            </div>
+                            <div class="job-item-content">
+                                <div class="job-item-title">${escapeHtml(job.filename)}</div>
+                                <div class="job-item-subtitle">${escapeHtml(job.current_step)}</div>
+                                <div class="job-progress-bar">
+                                    <div class="job-progress-fill" style="width: ${job.progress}%"></div>
+                                </div>
+                                <div class="job-progress-text">%${job.progress}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+            
+            widget.style.display = 'block';
+        }
+        
+        function updateWidgetVisibility(data) {
+            const icon = document.getElementById('job-widget-icon');
+            const statusText = document.getElementById('job-widget-status-text');
+            
+            if (data.has_active) {
+                icon.innerHTML = '<div class="mini-spinner"></div>';
+                statusText.textContent = 'Yapay Zeka Çalışıyor';
+            } else if (data.has_completed) {
+                icon.textContent = '🎉';
+                statusText.textContent = 'Hazır!';
+            } else {
+                icon.textContent = '⏳';
+                statusText.textContent = 'İşlemler';
+            }
+        }
+        
+        function toggleWidget() {
+            const body = document.getElementById('job-widget-body');
+            const toggleIcon = document.getElementById('widget-toggle-icon');
+            
+            widgetMinimized = !widgetMinimized;
+            
+            if (widgetMinimized) {
+                body.style.display = 'none';
+                toggleIcon.textContent = '+';
+            } else {
+                body.style.display = 'block';
+                toggleIcon.textContent = '−';
+            }
+        }
+        
+        function closeWidget() {
+            const widget = document.getElementById('job-widget');
+            widget.style.display = 'none';
+            widgetClosed = true;
+            
+            setTimeout(() => {
+                widgetClosed = false;
+            }, 5000);
+        }
+        
+        async function markJobSeen(jobId, removeFromList = false) {
+            try {
+                await fetch(`/api/jobs/mark-seen/${jobId}`, { method: 'POST' });
+                
+                if (removeFromList) {
+                    const item = document.querySelector(`[data-job-id="${jobId}"]`);
+                    if (item) {
+                        item.style.transition = 'all 0.3s ease';
+                        item.style.opacity = '0';
+                        item.style.transform = 'translateX(50px)';
+                        setTimeout(() => {
+                            fetchActiveJobs();
+                        }, 300);
+                    }
+                }
+            } catch (error) {
+                console.error('Mark seen hatası:', error);
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        window.addEventListener('load', function() {
+            fetchActiveJobs();
+            pollInterval = setInterval(fetchActiveJobs, 2000);
+        });
+        
+        window.addEventListener('beforeunload', function() {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+    </script>
+    {% endif %}
+    
+    <!-- ═══ KARANLIK MOD SİSTEMİ ═══ -->
+    <script>
+        // Sayfa yüklenmeden ÖNCE tema uygula (FOUC önleme)
+        (function() {
+            const savedTheme = localStorage.getItem('eduscan-theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+            
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+        
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.style.transition = 'background-color 0.4s ease';
+            
+            if (newTheme === 'dark') {
+                html.setAttribute('data-theme', 'dark');
+            } else {
+                html.removeAttribute('data-theme');
+            }
+            
+            localStorage.setItem('eduscan-theme', newTheme);
+            updateThemeIcon();
+        }
+        
+        function updateThemeIcon() {
+            const icon = document.getElementById('theme-icon');
+            if (!icon) return;
+            
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            icon.style.transform = 'rotate(360deg) scale(0)';
+            
+            setTimeout(() => {
+                icon.textContent = isDark ? '☀️' : '🌙';
+                icon.style.transform = 'rotate(0deg) scale(1)';
+            }, 200);
+        }
+        
+        window.addEventListener('DOMContentLoaded', function() {
+            updateThemeIcon();
+        });
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            if (!localStorage.getItem('eduscan-theme')) {
+                if (e.matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+                updateThemeIcon();
+            }
+        });
+    </script>
+    
+    <!-- ═══ MOBILE HAMBURGER MENU ═══ -->
+    <script>
+        function toggleMobileMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+            
+            if (navLinks) {
+                navLinks.classList.toggle('mobile-open');
+            }
+            if (toggleBtn) {
+                toggleBtn.classList.toggle('active');
+            }
+        }
+        
+        // Bir linke tıklandığında menüyü kapat
+        document.addEventListener('DOMContentLoaded', function() {
+            const links = document.querySelectorAll('.nav-links a');
+            links.forEach(link => {
+                link.addEventListener('click', function() {
+                    const navLinks = document.getElementById('navLinks');
+                    const toggleBtn = document.querySelector('.mobile-menu-toggle');
+                    if (navLinks) navLinks.classList.remove('mobile-open');
+                    if (toggleBtn) toggleBtn.classList.remove('active');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="favorites-header">
+    <h1>⭐ Favori Sorularım</h1>
+    <p class="subtitle" style="color: var(--text-secondary);">
+        Tekrar bakmak istediğin sorular burada
+    </p>
+</div>
+
+{% if favorites_data %}
+
+<!-- Görünüm Toggle Butonları -->
+<div class="view-toggle-container">
+    <div class="view-toggle">
+        <button class="view-toggle-btn active" 
+                data-view="list" 
+                onclick="setView('list')"
+                title="Liste görünümü (alt alta)">
+            <span class="toggle-icon">📋</span>
+            <span class="toggle-text">Liste</span>
+        </button>
+        <button class="view-toggle-btn" 
+                data-view="grid" 
+                onclick="setView('grid')"
+                title="Kart görünümü (yan yana)">
+            <span class="toggle-icon">🔲</span>
+            <span class="toggle-text">Kartlar</span>
+        </button>
+    </div>
+    <div class="favorites-count">
+        ⭐ {{ favorites_data|length }} favori soru
+    </div>
+</div>
+
+<!-- Favoriler Listesi -->
+<div class="favorites-list" id="favorites-container">
+    {% for item in favorites_data %}
+    <div class="favorite-item" data-favorite-id="{{ item.favorite.id }}">
+        <div class="favorite-item-header">
+            <div class="favorite-document">
+                📄 
+                {% if item.document %}
+                <a href="{{ url_for('main.view_document', doc_id=item.document.id) }}">
+                    {{ item.document.filename }}
+                </a>
+                {% else %}
+                <span>Silinmiş doküman</span>
+                {% endif %}
+                {% if item.topic %}
+                <br><span class="favorite-topic">📚 {{ item.topic.topic_name }}</span>
+                {% endif %}
+            </div>
+            <div class="favorite-date">
+                ⭐ {{ item.favorite.created_at.strftime('%d.%m.%Y') }}
+            </div>
+        </div>
+        
+        <div class="question-meta" style="margin-bottom: 0.75rem;">
+            <span class="badge badge-{{ item.question.difficulty }}">{{ item.question.difficulty|upper }}</span>
+            <span class="badge badge-type">{{ item.question.question_type|replace('_', ' ') }}</span>
+        </div>
+        
+        {% if item.question.measured_concept %}
+        <div class="measured-concept" style="margin-bottom: 0.75rem;">
+            🎯 <strong>Ölçülen:</strong> {{ item.question.measured_concept }}
+        </div>
+        {% endif %}
+        
+        <div class="favorite-question-text">
+            {{ item.question.question_text|safe }}
+        </div>
+        
+        <div class="favorite-actions">
+            {% if item.document %}
+            <a href="{{ url_for('main.view_document', doc_id=item.document.id) }}#question-{{ item.question.id }}" 
+               class="btn-view-question">
+                👁️ Soruyu Görüntüle
+            </a>
+            {% endif %}
+            <button class="btn-remove-favorite"
+                    data-question-id="{{ item.question.id }}"
+                    data-favorite-id="{{ item.favorite.id }}"
+                    onclick="removeFavorite(this.dataset.questionId, this.dataset.favoriteId)">
+                🗑️ Çıkar
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="favorites-empty">
+    <div class="favorites-empty-icon">⭐</div>
+    <h2>Henüz favori sorun yok</h2>
+    <p style="color: var(--text-secondary); margin: 0.5rem 0 1.5rem 0;">
+        Sorulara ⭐ ikonuna tıklayarak favorile ve buradan kolayca eriş
+    </p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary" 
+       style="display: inline-block; width: auto; padding: 0.75rem 2rem;">
+        🏠 Ana Sayfaya Git
+    </a>
+</div>
+{% endif %}
+
+<script>
+// ═══════════════════════════════════════════
+// GÖRÜNÜM TOGGLE SİSTEMİ
+// ═══════════════════════════════════════════
+
+function setView(viewType) {
+    const container = document.getElementById('favorites-container');
+    const buttons = document.querySelectorAll('.view-toggle-btn');
+    
+    if (!container) return;
+    
+    // Önceki sınıfları temizle
+    container.classList.remove('view-list', 'view-grid');
+    container.classList.add(`view-${viewType}`);
+    
+    // Buton durumlarını güncelle
+    buttons.forEach(btn => {
+        if (btn.dataset.view === viewType) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Tercihi kaydet
+    localStorage.setItem('eduscan-favorites-view', viewType);
+}
+
+// Sayfa yüklendiğinde — kaydedilen tercihi uygula
+window.addEventListener('load', function() {
+    const savedView = localStorage.getItem('eduscan-favorites-view') || 'list';
+    setView(savedView);
+    
+    // MathJax render
+    if (window.MathJax) MathJax.typesetPromise();
+});
+
+// ═══════════════════════════════════════════
+// FAVORI KALDIRMA
+// ═══════════════════════════════════════════
+
+async function removeFavorite(questionId, favoriteId) {
+    if (!confirm('Bu soruyu favorilerden çıkarmak istediğinden emin misin?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/favorite/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ question_id: questionId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const card = document.querySelector(`[data-favorite-id="${favoriteId}"]`);
+            if (card) {
+                card.style.transition = 'all 0.4s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.8)';
+                
+                setTimeout(() => {
+                    card.remove();
+                    
+                    // Sayaç güncelle
+                    const remaining = document.querySelectorAll('.favorite-item');
+                    const countEl = document.querySelector('.favorites-count');
+                    if (countEl) {
+                        countEl.textContent = `⭐ ${remaining.length} favori soru`;
+                    }
+                    
+                    // Boş kaldıysa sayfa yeniden yüklensin
+                    if (remaining.length === 0) {
+                        window.location.reload();
+                    }
+                }, 400);
+            }
+        }
+    } catch (error) {
+        console.error('Favori kaldırma hatası:', error);
+        alert('Bir hata oluştu, tekrar dene.');
+    }
+}
+</script>
+
+{% endblock %}
