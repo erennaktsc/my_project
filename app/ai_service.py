@@ -20,7 +20,6 @@ load_dotenv()
 # CONFIG
 # ═══════════════════════════════════════════
 
-client = genai.Client(api_key=os.getenv('AIzaSyCZWyMJdLuTry271TQfhPahDpN0q2jqkb0'))
 
 ANALYSIS_MODEL = 'gemini-2.5-flash'      # Çalışan, kararlı model
 GENERATION_MODEL = 'gemini-2.5-flash'    # Çalışan, kararlı model
